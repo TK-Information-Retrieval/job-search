@@ -1,51 +1,58 @@
 import re
-from autocomplete import predict, models, load
+import autocomplete
 
-def load_model(pickle_file:str=None) -> None:
-    """
-    Load dictionary
-    
-    parameters:
-    - pickle_file (str): filepath to pickle
-    
-    returns: None
-    """
-    if pickle_file == None:
-        load()
-    else:
-        models.load_models(pickle_file)
-    
-def get_suggestions(query: str, limit:int=5) -> list[str]:
-    """
-    Function 
-    
-    parameters:
-    - query (str): query passed from the frontend
-    - limit (int): maximum suggestions
-    
-    returns:
-    query suggestions (list[str])
-    """
-    tokens = re.split(r'\W+', query)
+class QueryAutoCompletion():
+    def __init__(self, filepath=None):
+        """
+        Initializes QAC class
+        """
+            
+    def load_model(self, pickle_filepath:str=None) -> None:
+        """
+        Load dictionary
         
-    if len(tokens) > 0:
-        try:
-            predictions = predict(tokens[-2], tokens[-1], limit)
-            if len(predictions < limit):
-                predictions.extend(predict(tokens[-1], '', limit))
-        except:
-            predictions = predict(tokens[-1], '', limit)
+        parameters:
+        - pickle_filepath (str): filepath to pickle
         
-        predictions = [query + suggestion[len(tokens[-1]):] for suggestion, _ in predictions]
-        return predictions[:limit]
+        returns: None
+        """
+        if pickle_filepath == None:
+            autocomplete.load()
+        else:
+            autocomplete.models.load_models(pickle_filepath)
+        
+    def get_suggestions(self, query: str, limit:int=5) -> list[str]:
+        """
+        Function 
+        
+        parameters:
+        - query (str): query passed from the frontend
+        - limit (int): maximum suggestions
+        
+        returns:
+        query suggestions (list[str])
+        """
+        tokens = re.split(r'\W+', query)
+            
+        if len(tokens) > 0:
+            try:
+                predictions = autocomplete.predict(tokens[-2], tokens[-1], limit)
+                if len(predictions < limit):
+                    predictions.extend(autocomplete.predict(tokens[-1], '', limit))
+            except:
+                predictions = autocomplete.predict(tokens[-1], '', limit)
+            
+            predictions = [query + suggestion[len(tokens[-1]):] 
+                           for suggestion, _ in predictions]
+            return predictions[:limit]
 
 def main():
-    top_n = 5
-    load_model("qac.pkl")
+    qac = QueryAutoCompletion()
+    qac.load_model("qac.pkl")
     
     while True:
         query = input("Search for: ")
-        print(get_suggestions(query, top_n))
+        print(qac.get_suggestions(query, 7))
 
 if __name__ == "__main__":
     main()

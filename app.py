@@ -21,6 +21,7 @@ if not pt.started():
 # Import our search engine
 # Assuming the previous code is saved in a file called advanced_search_engine.py
 from index import SearchEngine
+from qac import QueryAutoCompletion
 
 # FastAPI models
 class SearchQuery(BaseModel):
@@ -38,6 +39,9 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: List[SearchResult]
     summary: str
+
+class QuerySuggestionResponse(BaseModel):
+    results: List[str]
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -60,10 +64,13 @@ search_engine = None
 async def startup_event():
     """Initialize the search engine when the app starts."""
     global search_engine
+    global qac
     search_engine = SearchEngine()
     search_engine.load_index()
-    # Set default retrieval model
     search_engine.set_retrieval_model("BM25")
+    
+    qac = QueryAutoCompletion()
+    qac.load_model("qac.pkl")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -168,6 +175,17 @@ async def add_document(document: Dict[str, Any]):
     search_engine.create_index([document])
     
     return {"status": "success", "message": "Document added successfully"}
+
+@app.get("/api/suggest", response_model=QuerySuggestionResponse)
+async def get_suggestions(query: SearchQuery = Query(None)):
+    """
+    Get query suggestions while typing
+    
+    Args:
+        query: string -> as query params
+    """
+    results = qac.get_suggestions(query.query)
+    return {"results": results}
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
