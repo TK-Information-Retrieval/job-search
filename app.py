@@ -169,5 +169,12 @@ async def add_document(document: Dict[str, Any]):
     
     return {"status": "success", "message": "Document added successfully"}
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint
+    """
+    return {"status": "healthy", "message": "Job Search API is running"}
+
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
