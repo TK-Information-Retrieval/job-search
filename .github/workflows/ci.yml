@@ -1,0 +1,194 @@
+name: Deploy Job Search API to Google Cloud VM
+
+on:
+  push:
+    branches:
+      - master
+      - '**/ci**'
+    paths-ignore:
+      - README.md
+      - .gitignore
+      - docs/**
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - README.md
+      - .gitignore
+      - docs/**
+
+env:
+  DOCKER_IMAGE_NAME: job-search-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run basic syntax check
+        run: |
+          python -m py_compile *.py
+          echo "✅ Python syntax check passed"
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || contains(github.ref, 'ci'))
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Docker Hub Authentication
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate Docker tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: publish
+    if: github.ref == 'refs/heads/master'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify GCP Connection
+        run: |
+          gcloud info
+          gcloud compute instances list --limit=1
+
+      - name: Deploy to Google Cloud VM
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.GCP_VM_IP }}
+          username: ${{ secrets.GCP_VM_USERNAME }}
+          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+          timeout: 300s
+          script: |
+            echo "🚀 Starting deployment of Resume Processing API..."
+            
+            # Pull latest Docker image
+            echo "📦 Pulling latest Docker image..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            
+            # Stop and remove existing container
+            echo "🛑 Stopping existing container..."
+            docker stop job-search-api || true
+            docker rm job-search-api || true
+            
+            # Remove old images to save space
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
+            
+            # Start new container
+            echo "🔄 Starting new container..."
+            docker run -d \
+              --name job-search-api \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              --memory="2g" \
+              --cpus="1.0" \
+              -e HF_TOKEN="${{ secrets.HF_TOKEN }}" \
+              -e EXTERNAL_API_URL="${{ secrets.EXTERNAL_API_URL }}" \
+              -e LOG_LEVEL="${{ vars.LOG_LEVEL || 'INFO' }}" \
+              --health-cmd="curl -f http://localhost:8000/health || exit 1" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=3 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            
+            # Wait for container to be healthy
+            echo "⏳ Waiting for container to be healthy..."
+            timeout=60
+            while [ $timeout -gt 0 ]; do
+              if docker inspect --format='{{.State.Health.Status}}' job-search-api | grep -q "healthy"; then
+                echo "✅ Container is healthy!"
+                break
+              fi
+              echo "Waiting... ($timeout seconds remaining)"
+              sleep 5
+              timeout=$((timeout-5))
+            done
+            
+            if [ $timeout -le 0 ]; then
+              echo "❌ Container failed to become healthy within timeout"
+              docker logs job-search-api --tail 50
+              exit 1
+            fi
+            
+            # Verify deployment
+            echo "🔍 Verifying deployment..."
+            docker ps | grep job-search-api
+            
+            # Test the API endpoint
+            echo "🧪 Testing API health endpoint..."
+            sleep 10  # Give the API a moment to fully start
+            if curl -f http://localhost:8000/health; then
+              echo "✅ API is responding correctly!"
+            else
+              echo "❌ API health check failed"
+              docker logs job-search-api --tail 20
+              exit 1
+            fi
+            
+            echo "🎉 Deployment completed successfully!"
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+    steps:
+      - name: Notify Deployment Status
+        run: |
+          if [[ "${{ needs.deploy.result }}" == "success" ]]; then
+            echo "✅ Resume Processing API deployed successfully to production!"
+            echo "🌐 API URL: http://${{ secrets.GCP_VM_IP }}:8000"
+            echo "📊 Health Check: http://${{ secrets.GCP_VM_IP }}:8000/health"
+            echo "📚 API Docs: http://${{ secrets.GCP_VM_IP }}:8000/docs"
+          else
+            echo "❌ Deployment failed. Please check the logs."
+            exit 1
+          fi
