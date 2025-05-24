@@ -3,7 +3,7 @@ name: Deploy Job Search API to Google Cloud VM
 on:
   push:
     branches:
-      - master
+      - main
       - '**/ci**'
     paths-ignore:
       - README.md
@@ -11,7 +11,7 @@ on:
       - docs/**
   pull_request:
     branches:
-      - master
+      - main
     paths-ignore:
       - README.md
       - .gitignore
@@ -45,7 +45,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || contains(github.ref, 'ci'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || contains(github.ref, 'ci'))
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -62,7 +62,7 @@ jobs:
       - name: Generate Docker tag
         id: tag
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "tag=latest" >> $GITHUB_OUTPUT
           else
             echo "tag=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
@@ -82,7 +82,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: publish
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: 'read'
       id-token: 'write'
