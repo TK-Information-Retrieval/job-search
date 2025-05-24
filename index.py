@@ -12,6 +12,8 @@ import pandas as pd
 import pyterrier as pt
 from llm import LLMModel
 from tqdm import tqdm
+import pandas as pd
+from sqlalchemy import text
 
 # Initialize PyTerrier
 if not pt.started():
@@ -88,8 +90,34 @@ class SearchEngine:
             self.retrieval_model = pt.BatchRetrieve(self.index, wmodel="BM25")
             
         print(f"Retrieval model set to {model_name}")
+
+    def fetch_documents_from_db(engine, doc_ids):
+        """
+        Fetch documents from the PostgreSQL database using a list of doc IDs.
         
-    def search(self, query, num_results=10):
+        Args:
+            engine: SQLAlchemy engine
+            doc_ids: List of document IDs (as strings or ints)
+            
+        Returns:
+            DataFrame with rows from the job_listings table
+        """
+        if not doc_ids:
+            return pd.DataFrame()  # Return empty if no IDs
+        
+        placeholders = ','.join(['%s'] * len(doc_ids))
+        query = f"""
+            SELECT * FROM job_listings
+            WHERE "Job Id" IN ({placeholders})
+        """
+
+        with engine.connect() as conn:
+            result = conn.execute(text(query), doc_ids)
+            rows = result.fetchall()
+            columns = result.keys()
+            return pd.DataFrame(rows, columns=columns)
+        
+    def search(self, query, num_results=10, engine=None):
         """
         Search the index with a query.
         
@@ -111,19 +139,15 @@ class SearchEngine:
         if len(results) > num_results:
             results = results.head(num_results)
         
-        if hasattr(self, 'documents_df'):
+        if engine is not None:
             if 'docno' not in results.columns and 'docid' in results.columns:
-                results = results.rename(columns={'docid': 'docno'})            
-            self.documents_df['Job Id'] = self.documents_df['Job Id'].astype(str)
+                results = results.rename(columns={'docid': 'docno'})
             
-            # Get the full documents for these results
-            merged_results = pd.merge(
-                results,
-                self.documents_df,
-                left_on='docno',
-                right_on='Job Id',
-                how='left'
-            )
+            doc_ids = results['docno'].tolist()
+            doc_rows = self.fetch_documents_from_db(engine, doc_ids)
+
+            # Optional: merge back for scores or ranking
+            merged_results = pd.merge(results, doc_rows, left_on='docno', right_on='Job Id', how='left')
             return merged_results
         else:
             return results
@@ -193,32 +217,6 @@ def start_indexing():
             'skills', 'Responsibilities', 'Company', 'Company Profile']
     df = df[columns]
     search_engine.create_index(df)
-    
-    # Set retrieval model
-    search_engine.set_retrieval_model("BM25")
-    
-    # Perform searches
-    print("\nSearch example 1: 'python programming'")
-    results = search_engine.search("python programming")
-
-    try:
-        display_cols = ['Job Id', 'Job Title', 'Job Description', 'score']
-        print(results[display_cols].to_string(index=False))
-    except KeyError as e:
-        print(f"Original columns not found ({e}), using available columns instead")
-        display_cols = [col for col in results.columns if col in 
-                    ['docno', 'score', 'rank', 'Job Title', 'Job Description']]
-        if display_cols:
-            print(results[display_cols].to_string(index=False))
-        else:
-            print(results.to_string(index=False))
-
-    # Try to summarize results
-    try:
-        summary = search_engine.summarize_results(results)
-        print("\nSummary of results:\n", summary)
-    except Exception as e:
-        print(f"Could not generate summary: {e}")
 
 if __name__ == "__main__":
     print("Job Search Engine Indexing Process")

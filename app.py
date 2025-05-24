@@ -176,6 +176,13 @@ async def add_document(document: Dict[str, Any]):
     
     return {"status": "success", "message": "Document added successfully"}
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint
+    """
+    return {"status": "healthy", "message": "Job Search API is running"}
+
 @app.get("/api/suggest", response_model=QuerySuggestionResponse)
 async def get_suggestions(query: SearchQuery = Query(None)):
     """
