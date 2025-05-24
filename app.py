@@ -183,6 +183,7 @@ async def set_model(config: ModelConfig):
     
     return {"status": "success", "message": f"Model changed to {config.model}"}
 
+
 @app.get("/api/info")
 async def get_info():
     """
@@ -199,6 +200,7 @@ async def get_info():
         "unique_terms": stats.numberOfUniqueTerms,
         "available_models": ["BM25", "TF_IDF", "DirichletLM"]
     }
+
 
 @app.post("/api/add_document")
 async def add_document(document: Dict[str, Any]):
@@ -223,6 +225,15 @@ async def add_document(document: Dict[str, Any]):
     search_engine.create_index([document])
     
     return {"status": "success", "message": "Document added successfully"}
+
+
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint
+    """
+    return {"status": "healthy", "message": "Job Search API is running"}
+
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

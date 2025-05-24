@@ -81,7 +81,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: publish
-    if: github.ref == 'refs/heads/main'
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -130,8 +129,11 @@ jobs:
               -p 8000:8000 \
               --memory="2g" \
               --cpus="1.0" \
-              -e HF_TOKEN="${{ secrets.HF_TOKEN }}" \
-              -e EXTERNAL_API_URL="${{ secrets.EXTERNAL_API_URL }}" \
+              -e DB_NAME="${{ secrets.DB_NAME }}" \
+              -e DB_USER="${{ secrets.DB_USER }}" \
+              -e DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              -e DB_HOST="${{ secrets.DB_HOST }}" \
+              -e DB_PORT="${{ secrets.DB_PORT }}" \
               -e LOG_LEVEL="${{ vars.LOG_LEVEL || 'INFO' }}" \
               --health-cmd="curl -f http://localhost:8000/health || exit 1" \
               --health-interval=30s \
