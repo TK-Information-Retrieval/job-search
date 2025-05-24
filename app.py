@@ -56,6 +56,7 @@ templates = Jinja2Templates(directory="templates")
 # Global search engine instance
 search_engine = None
 
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize the search engine when the app starts."""
@@ -65,12 +66,6 @@ async def startup_event():
     # Set default retrieval model
     search_engine.set_retrieval_model("BM25")
 
-
-@app.get("/", response_class=HTMLResponse)
-async def home():
-    """Serve the search engine homepage."""
-    with open("templates/index.html", "r") as f:
-        return f.read()
 
 @app.post("/api/search", response_model=SearchResponse)
 async def search(query: SearchQuery):
@@ -91,10 +86,9 @@ async def search(query: SearchQuery):
         query.query, 
         num_results=query.num_results, 
     )
-    summary = search_engine.summarize_results(results)
     
     # Convert to response model
-    response = {"results": [], "summary": summary}
+    response = {"results": []}
     for _, row in results.iterrows():
         result = {
             "docno": row['docno'],
@@ -106,8 +100,8 @@ async def search(query: SearchQuery):
             result['url'] = row['url']
             
         response["results"].append(result)
-    print(f">>>>> Response: {response}")    
     return response
+
 
 @app.post("/api/set_model")
 async def set_model(config: ModelConfig):
@@ -128,6 +122,7 @@ async def set_model(config: ModelConfig):
     
     return {"status": "success", "message": f"Model changed to {config.model}"}
 
+
 @app.get("/api/info")
 async def get_info():
     """
@@ -144,6 +139,7 @@ async def get_info():
         "unique_terms": stats.numberOfUniqueTerms,
         "available_models": ["BM25", "TF_IDF", "DirichletLM"]
     }
+
 
 @app.post("/api/add_document")
 async def add_document(document: Dict[str, Any]):
@@ -169,12 +165,14 @@ async def add_document(document: Dict[str, Any]):
     
     return {"status": "success", "message": "Document added successfully"}
 
+
 @app.get("/health")
 async def health_check():
     """
     Health check endpoint
     """
     return {"status": "healthy", "message": "Job Search API is running"}
+
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
