@@ -10,7 +10,6 @@ This script extends the basic search engine with additional features:
 import os
 import pandas as pd
 import pyterrier as pt
-from llm import LLMModel
 from tqdm import tqdm
 import pandas as pd
 from sqlalchemy import text
