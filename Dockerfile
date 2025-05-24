@@ -7,11 +7,11 @@ WORKDIR /app
 # Install system dependencies required for the libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    openjdk-11-jre-headless \
+    default-jre \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables for Java
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/default-java
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Copy requirements first for better Docker layer caching
