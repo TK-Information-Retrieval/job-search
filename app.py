@@ -38,7 +38,7 @@ class SearchResult(BaseModel):
 
 class SearchResponse(BaseModel):
     results: List[SearchResult]
-    summary: str
+    # summary: str
 
 class QuerySuggestionResponse(BaseModel):
     results: List[str]
@@ -98,10 +98,13 @@ async def search(query: SearchQuery):
         query.query, 
         num_results=query.num_results, 
     )
-    summary = search_engine.summarize_results(results)
+    # summary = search_engine.summarize_results(results)
     
     # Convert to response model
-    response = {"results": [], "summary": summary}
+    response = {
+        "results": [], 
+        # "summary": summary
+    }
     for _, row in results.iterrows():
         result = {
             "docno": row['docno'],
