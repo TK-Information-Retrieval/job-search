@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
@@ -31,6 +32,21 @@ app = FastAPI(
     title="PyTerrier Search API",
     description="A RESTful API for searching documents using PyTerrier",
     version="1.0.0",
+)
+
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://34.41.40.185:8000"
+    "https://seekcareer.netlify.app",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Database connection parameters
