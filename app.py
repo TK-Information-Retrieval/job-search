@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 
@@ -33,6 +34,8 @@ app = FastAPI(
 )
 
 # Database connection parameters
+load_dotenv()
+
 db_params = {
     'database': os.getenv('DB_NAME'),
     'user': os.getenv('DB_USER'),  
@@ -83,21 +86,8 @@ async def home():
     with open("templates/index.html", "r") as f:
         return f.read()
 
-@app.get("/api/jobs", response_model=SearchResponse)
-async def get_jobs():
-    if not search_engine:
-        raise HTTPException(status_code=500, detail="Search engine not initialized")
-    
-    # Perform search
-    results = search_engine.fetch_documents(engine=db)
-    
-    # Convert to response model
-    response = {"results": results}
-    print(f">>>>> Response: {response}")    
-    return response
-
 @app.get("/api/search", response_model=SearchResponse)
-async def search(query: SearchQuery):
+async def search(query: SearchQuery = Query(None)):
     """
     Search API endpoint
     
@@ -122,11 +112,24 @@ async def search(query: SearchQuery):
     print(f">>>>> Response: {response}")    
     return response
 
-@app.get("/api/detail/{id}", response_model=SearchDetail)
+@app.get("/api/jobs", response_model=SearchResponse)
+async def get_jobs():
+    if not search_engine:
+        raise HTTPException(status_code=500, detail="Search engine not initialized")
+    
+    # Perform search
+    results = search_engine.fetch_documents(engine=db)
+    
+    # Convert to response model
+    response = {"results": results}
+    print(f">>>>> Response: {response}")    
+    return response
+
+@app.get("/api/jobs/{id}", response_model=SearchDetail)
 async def get_details(id: str):
     
     """
-    Get details
+    Get jobs details
     
     Args:
         query (SearchQuery): Search parameters

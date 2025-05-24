@@ -76,46 +76,122 @@ python client.py add "doc11" "This is a new document about search engines."
 
 ## Code Structure
 
--   `search.py` - Core search engine functionality
+-   `index.py` - Core search engine functionality
 -   `app.py` - FastAPI interface
--   `client.py` - Command-line client
--   `templates/index.html` - Web interface template
--   `llm.py` - LLM integration for summarization
+-   `schema.py` - request and response schema
+-   `qac.py` - query autocomplete funtionality
 
 ## API Reference
 
 ### Search (`/api/search`)
 
 ```
-POST /api/search
+GET /api/search?query=<query>&num_results=<limit>
+
+Query params:
+  {
+    "query": "python programming",
+    "num_results": 10
+  }
+
+Returns:
+  {
+    "results" : [
+      {
+        "job_id": "1079021951564169",
+        "job_title": "Front-End Developer",
+        "company": "Dixons Carphone",
+        "location": "New Delhi",
+        "salary_range": "$58K-$80K"
+      },
+      {...},
+      ...
+    ]
+  }
+```
+
+
+### Get Jobs (`/api/jobs`)
+
+```
+GET /api/jobs
+
+Returns:
 {
-  "query": "python programming",
-  "use_expansion": false,
-  "num_results": 10
-}
+    "results" : [
+      {
+        "job_id": "1079021951564169",
+        "job_title": "Front-End Developer",
+        "company": "Dixons Carphone",
+        "location": "New Delhi",
+        "salary_range": "$58K-$80K"
+      },
+      {...},
+      ...
+    ]
+  }
 ```
 
-### Set Model (`/api/set_model`)
+### Get Job Detail (`/api/jobs/{doc_id}`)
 
 ```
-POST /api/set_model
+GET /api/jobs/{doc_id}
+
+Returns:
 {
-  "model": "BM25" | "TF_IDF" | "DirichletLM"
-}
+  "job_id": "1041276767356708",
+  "experience": "2 to 10 Years",
+  "qualifications": "B.Tech",
+  "salary_range": "$60K-$89K",
+  "location": "Dushanbe",
+  "country": "Tajikistan",
+  "latitude": 38.861,
+  "longitude": 71.2761,
+  "work_type": "Contract",
+  "company_size": 53817,
+  "job_posting_date": "2021-10-24",
+  "preference": "Female",
+  "contact_person": "Jeff Sharp",
+  "contact": "763-546-3525x210",
+  "job_title": "Structural Engineer",
+  "role": "Design Engineer",
+  "job_portal": "Snagajob",
+  "job_description": "A Design Engineer creates and develops product designs and specifications, using engineering principles and design software to bring innovative products to market.",
+  "benefits": [
+    "'Employee Referral Programs", 
+    "Financial Counseling", 
+    "Health and Wellness Facilities"
+  ],
+  "skills": "Engineering design CAD software proficiency Problem-solving Technical knowledge Communication skills",
+  "responsibilities": [
+    "Design structural systems and components for buildings and infrastructure projects.",
+    "Perform structural analysis and calculations",
+    "Create detailed design plans and specifications."
+  ],
+  "company": "Microsoft",
+  "company_profile": {
+    "CEO": "Satya Nadella",
+    "Zip": "98052",
+    "City": "Redmond",
+    "State": "Washington",
+    "Sector": "Technology",
+    "Ticker": "MSFT",
+    "Website": "www.microsoft.com",
+    "Industry": "Computer Software"
+  }
 ```
 
-### Get Info (`/api/info`)
+
+### Get Query Suggestions (`/api/suggest`)
 
 ```
-GET /api/info
-```
+GET /api/jobs?query=<query>
 
-### Add Document (`/api/add_document`)
-
-```
-POST /api/add_document
+Returns:
 {
-  "docno": "doc11",
-  "text": "This is a new document about search engines."
+  "results" : [
+    "rec1",
+    "req2"
+  ]
 }
 ```
