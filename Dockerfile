@@ -1,4 +1,4 @@
-# Use Python 3.9 slim image as base
+# Use Python 3.9 image as base
 FROM python:3.9
 
 # Set working directory
@@ -7,7 +7,12 @@ WORKDIR /app
 # Install system dependencies required for the libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    openjdk-11-jdk \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Set JAVA_HOME and update PATH
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt .
