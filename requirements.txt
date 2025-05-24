@@ -6,5 +6,6 @@ pydantic
 nltk
 beautifulsoup4
 python-dotenv
+autocomplete
 psycopg2
 sqlalchemy

@@ -9,6 +9,7 @@ import time
 import sys
 from dotenv import load_dotenv
 import os
+import sqlalchemy
 
 load_dotenv()
 
@@ -41,7 +42,7 @@ db_params = {
     'host': os.getenv('DB_HOST'),
     'port': os.getenv('DB_PORT')
 }
-csv_file_path = 'collection/job_descriptions_small.csv'
+csv_file_path = 'job_descriptions.csv'
 try:
     print("Testing database connection...")
     conn = psycopg2.connect(
@@ -62,6 +63,9 @@ except Exception as e:
     print("3. Make sure your network can reach Supabase")
     sys.exit(1)
 
+print(pd.__version__)
+print(sqlalchemy.__version__)
+
 password_encoded = quote_plus(db_params['password'])
 connection_string = f"postgresql://{db_params['user']}:{password_encoded}@{db_params['host']}:{db_params['port']}/{db_params['database']}"
 
@@ -79,39 +83,39 @@ except Exception as e:
     sys.exit(1)
 
 try:
-    with engine.connect() as connection:
+    with engine.begin() as connection:
         result = connection.execute(text("SELECT to_regclass('public.job_listings')"))
         table_exists = result.scalar()
         
         if not table_exists:
             print("Creating job_listings table...")
-            connection.execute("""
+            connection.execute(text("""
                 CREATE TABLE job_listings (
-                    "Job Id" BIGINT PRIMARY KEY,
-                    "Experience" VARCHAR(100),
-                    "Qualifications" VARCHAR(100),
-                    "Salary Range" VARCHAR(50),
-                    "location" VARCHAR(100),
-                    "Country" VARCHAR(100),
-                    "latitude" DECIMAL(10, 6),
-                    "longitude" DECIMAL(10, 6),
-                    "Work Type" VARCHAR(50),
-                    "Company Size" INTEGER,
-                    "Job Posting Date" DATE,
-                    "Preference" VARCHAR(50),
-                    "Contact Person" VARCHAR(100),
-                    "Contact" VARCHAR(100),
-                    "Job Title" VARCHAR(100),
-                    "Role" VARCHAR(100),
-                    "Job Portal" VARCHAR(100),
-                    "Job Description" TEXT,
-                    "Benefits" TEXT,
-                    "skills" TEXT,
-                    "Responsibilities" TEXT,
-                    "Company" VARCHAR(100),
-                    "Company Profile" JSONB
+                    job_id BIGINT PRIMARY KEY,
+                    experience VARCHAR(100),
+                    qualifications VARCHAR(100),
+                    salary_range VARCHAR(50),
+                    location VARCHAR(100),
+                    country VARCHAR(100),
+                    latitude DECIMAL(10, 6),
+                    longitude DECIMAL(10, 6),
+                    work_type VARCHAR(50),
+                    company_size INTEGER,
+                    job_posting_date DATE,
+                    preference VARCHAR(50),
+                    contact_person VARCHAR(100),
+                    contact VARCHAR(100),
+                    job_title VARCHAR(100),
+                    role VARCHAR(100),
+                    job_portal VARCHAR(100),
+                    job_description TEXT,
+                    benefits TEXT,
+                    skills TEXT,
+                    responsibilities TEXT,
+                    company VARCHAR(100),
+                    company_profile JSONB
                 )
-            """)
+            """))
             print("Table created successfully")
         else:
             print("Table already exists, proceeding with import")
@@ -138,8 +142,10 @@ try:
     
     for chunk_index, chunk in enumerate(pd.read_csv(csv_file_path, chunksize=chunksize)):
         chunk_start = time.time()
-        if chunk_index != 6:
+        if chunk_index < 170:
             continue
+        if chunk_index > 250:
+            break
         print(f"\nProcessing chunk {chunk_index+1}...")
         
         # Clean up data
@@ -153,6 +159,8 @@ try:
         chunk['longitude'] = pd.to_numeric(chunk['longitude'], errors='coerce')
         chunk['Company Size'] = pd.to_numeric(chunk['Company Size'], errors='coerce')
         chunk = chunk.drop_duplicates(subset=['Job Id'])
+        
+        chunk.columns = [col.lower().replace(" ", "_") for col in chunk.columns]
         
         # Write to PostgreSQL
         print(f"Writing {len(chunk)} rows to database...")
@@ -188,11 +196,11 @@ print("\nVerifying imported data...")
 try:
     with psycopg2.connect(**db_params) as conn:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) FROM job_listings")
+            cursor.execute("SELECT COUNT(*) FROM public.job_listings")
             count = cursor.fetchone()[0]
             print(f"Total rows in database: {count}")
             
-            cursor.execute("SELECT * FROM job_listings LIMIT 3")
+            cursor.execute("SELECT * FROM public.job_listings LIMIT 3")
             sample_data = cursor.fetchall()
             print("\nSample data from database:")
             for row in sample_data:

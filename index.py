@@ -6,12 +6,12 @@ This script extends the basic search engine with additional features:
 - Custom preprocessing
 - Search results highlighting
 """
-
 import os
+import re
+import json
 import pandas as pd
 import pyterrier as pt
 from tqdm import tqdm
-import pandas as pd
 from sqlalchemy import text
 
 # Initialize PyTerrier
@@ -90,7 +90,12 @@ class SearchEngine:
             
         print(f"Retrieval model set to {model_name}")
 
-    def fetch_documents_from_db(engine, doc_ids):
+    def parse_job_fields(self, row: dict) -> dict:
+        row["benefits"] = json.loads(row["benefits"])
+        row["responsibilities"] = re.findall(r'[^.]+(?:\.)?', row["responsibilities"])
+        return row
+
+    def fetch_documents(self, engine, doc_ids=None):
         """
         Fetch documents from the PostgreSQL database using a list of doc IDs.
         
@@ -101,20 +106,55 @@ class SearchEngine:
         Returns:
             DataFrame with rows from the job_listings table
         """
-        if not doc_ids:
-            return pd.DataFrame()  # Return empty if no IDs
+        if doc_ids==None:
+            # generic
+            query = text(f"""
+                SELECT job_id, job_title, company, location, salary_range FROM job_listings
+                LIMIT 20
+            """)
+
+            with engine.connect() as conn:
+                result = conn.execute(query)
+                rows = result.mappings().all()
+                return [dict(row) for row in rows]
+        else:
+            # specific
+            param_names = [f"id{i}" for i in range(len(doc_ids))]
+            placeholders = ", ".join([f":{name}" for name in param_names])
+            query = text(f"""
+                SELECT job_id, job_title, company, location, salary_range FROM job_listings
+                WHERE "job_id" IN ({placeholders})
+            """)
+
+            params = {f"id{i}": doc_id for i, doc_id in enumerate(doc_ids)}
+
+            with engine.connect() as conn:
+                result = conn.execute(query, params)
+                rows = result.mappings().all()
+                return [dict(row) for row in rows]
         
-        placeholders = ','.join(['%s'] * len(doc_ids))
-        query = f"""
-            SELECT * FROM job_listings
-            WHERE "Job Id" IN ({placeholders})
+    def fetch_details(self, engine, doc_id):
         """
+        Fetch detail from 1 of the documents from the PostgreSQL database using a doc IDs.
+        
+        Args:
+            engine: SQLAlchemy engine
+            doc_id: List of document ID (as string)
+            
+        Returns:
+            Dict
+        """
+        if not doc_id:
+            return []
+
+        query = text("""
+        SELECT * FROM job_listings WHERE "job_id" = :doc_id
+        """)
 
         with engine.connect() as conn:
-            result = conn.execute(text(query), doc_ids)
-            rows = result.fetchall()
-            columns = result.keys()
-            return pd.DataFrame(rows, columns=columns)
+            result = conn.execute(query, {"doc_id": doc_id})
+            row = result.mappings().first() 
+            return self.parse_job_fields(dict(row))
         
     def search(self, query, num_results=10, engine=None):
         """
@@ -143,14 +183,9 @@ class SearchEngine:
                 results = results.rename(columns={'docid': 'docno'})
             
             doc_ids = results['docno'].tolist()
-            doc_rows = self.fetch_documents_from_db(engine, doc_ids)
+            results = self.fetch_documents(engine, doc_ids)
 
-            # Optional: merge back for scores or ranking
-            merged_results = pd.merge(results, doc_rows, left_on='docno', right_on='Job Id', how='left')
-            return merged_results
-        else:
-            return results
-        
+        return results
     
 def start_indexing():
     print("Initializing job search engine...")
