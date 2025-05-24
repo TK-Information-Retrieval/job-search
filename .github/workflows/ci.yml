@@ -45,7 +45,6 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || contains(github.ref, 'ci'))
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
